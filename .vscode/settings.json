@@ -1,0 +1,7 @@
+{
+    "gopls": {
+        "analyses": {
+            "QF1003": false
+        }
+    }
+}
