@@ -127,9 +127,7 @@ func (ic *ImageContainer) Split(topLeft Coords, bottomRight Coords, margin int) 
 				// This region is for the tabs (part sticking out of a puzzle piece)
 				// We can optionally flip this pixel to be opaque later
 				if x < margin || x > split_ic.width-1-margin || y < margin || y > split_ic.height-1-margin {
-					c := split_ic.pixels[y][x].(color.NRGBA)
-					c.A = 0
-					split_ic.pixels[y][x] = c
+					SetA(&split_ic.pixels[y][x], 0)
 				}
 			} else {
 				// Else make the pixel completely transparent with no color values
@@ -209,31 +207,37 @@ func (p *TabGenerator) Get(x float64) float64 {
 	return p.curve.Predict(x)
 }
 
+// Change color type to NRGBA and set alpha of pixel
+func SetA(a *color.Color, b uint8) {
+	c := (*a).(color.NRGBA)
+	c.A = b
+	*a = c
+}
+
 // Generates tabs/blanks for each image
 // Intended to only be called on split image containers
 // with transparent margins that contain color data (nRGBA)
-func (ic *ImageContainer) DrawConnections(p Piece, margin int) {
+// See TabGenerator for the shape
+func (p *Piece) DrawConnections(margin int) {
 	if p.topConnector.connectionType == ConnectionTab {
 		for row := range margin {
 			w := p.topConnector.tabGenerator.Get(1.0 - (float64(row) / float64(margin-1)))
-			lb := (ic.width / 2) - int(w*float64(margin))
-			ub := (ic.width / 2) + int(w*float64(margin))
+			lb := (p.image.width / 2) - int(w*float64(margin))
+			ub := (p.image.width / 2) + int(w*float64(margin))
 			for col := lb; col <= ub; col++ {
-				c := ic.pixels[row][col].(color.NRGBA)
-				c.A = 255
-				ic.pixels[row][col] = c
+				SetA(&p.image.pixels[row][col], 255)
+				SetA(&p.image.pixels[row+margin][col], 255)
 			}
 		}
 	} else if p.topConnector.connectionType == ConnectionBlank {
 		for row := range margin {
 			w := p.topConnector.tabGenerator.Get((float64(row) / float64(margin-1)))
-			lb := (ic.width / 2) - int(w*float64(margin))
-			ub := (ic.width / 2) + int(w*float64(margin))
-			for col := range ic.width {
+			lb := (p.image.width / 2) - int(w*float64(margin))
+			ub := (p.image.width / 2) + int(w*float64(margin))
+			for col := range p.image.width {
 				if col > lb && col < ub {
-					c := ic.pixels[row+margin][col].(color.NRGBA)
-					c.A = 0
-					ic.pixels[row+margin][col] = c
+					SetA(&p.image.pixels[row+margin][col], 0)
+					SetA(&p.image.pixels[row][col], 0)
 				}
 			}
 		}
@@ -242,24 +246,22 @@ func (ic *ImageContainer) DrawConnections(p Piece, margin int) {
 	if p.bottomConnector.connectionType == ConnectionTab {
 		for row := range margin {
 			w := p.bottomConnector.tabGenerator.Get(1.0 - (float64(row) / float64(margin-1)))
-			lb := (ic.width / 2) - int(w*float64(margin))
-			ub := (ic.width / 2) + int(w*float64(margin))
+			lb := (p.image.width / 2) - int(w*float64(margin))
+			ub := (p.image.width / 2) + int(w*float64(margin))
 			for col := lb; col <= ub; col++ {
-				c := ic.pixels[ic.height-1-row][col].(color.NRGBA)
-				c.A = 255
-				ic.pixels[ic.height-1-row][col] = c
+				SetA(&p.image.pixels[p.image.height-1-row][col], 255)
+				SetA(&p.image.pixels[p.image.height-margin-row][col], 255)
 			}
 		}
 	} else if p.bottomConnector.connectionType == ConnectionBlank {
 		for row := range margin {
 			w := p.bottomConnector.tabGenerator.Get((float64(row) / float64(margin-1)))
-			lb := (ic.width / 2) - int(w*float64(margin))
-			ub := (ic.width / 2) + int(w*float64(margin))
-			for col := range ic.width {
+			lb := (p.image.width / 2) - int(w*float64(margin))
+			ub := (p.image.width / 2) + int(w*float64(margin))
+			for col := range p.image.width {
 				if col > lb && col < ub {
-					c := ic.pixels[ic.height-margin-row][col].(color.NRGBA)
-					c.A = 0
-					ic.pixels[ic.height-margin-row][col] = c
+					SetA(&p.image.pixels[p.image.height-margin-row][col], 0)
+					SetA(&p.image.pixels[p.image.height-1-row][col], 0)
 				}
 			}
 		}
@@ -268,23 +270,21 @@ func (ic *ImageContainer) DrawConnections(p Piece, margin int) {
 	if p.rightConnector.connectionType == ConnectionTab {
 		for col := range margin {
 			w := p.rightConnector.tabGenerator.Get((float64(col) / float64(margin-1)))
-			lb := (ic.height / 2) - int(w*float64(margin))
-			ub := (ic.height / 2) + int(w*float64(margin))
+			lb := (p.image.height / 2) - int(w*float64(margin))
+			ub := (p.image.height / 2) + int(w*float64(margin))
 			for row := lb; row <= ub; row++ {
-				c := ic.pixels[row][ic.width-1-margin+col].(color.NRGBA)
-				c.A = 255
-				ic.pixels[row][ic.width-1-margin+col] = c
+				SetA(&p.image.pixels[row][p.image.width-1-margin+col], 255)
+				SetA(&p.image.pixels[row][p.image.width-1-margin-col], 255)
 			}
 		}
 	} else if p.rightConnector.connectionType == ConnectionBlank {
 		for col := range margin {
 			w := p.rightConnector.tabGenerator.Get((float64(col) / float64(margin-1)))
-			lb := (ic.height / 2) - int(w*float64(margin))
-			ub := (ic.height / 2) + int(w*float64(margin))
+			lb := (p.image.height / 2) - int(w*float64(margin))
+			ub := (p.image.height / 2) + int(w*float64(margin))
 			for row := lb; row <= ub; row++ {
-				c := ic.pixels[row][ic.width-1-margin-col].(color.NRGBA)
-				c.A = 0
-				ic.pixels[row][ic.width-1-margin-col] = c
+				SetA(&p.image.pixels[row][p.image.width-1-margin-col], 0)
+				SetA(&p.image.pixels[row][p.image.width-1-margin+col], 0)
 			}
 		}
 	}
@@ -292,24 +292,26 @@ func (ic *ImageContainer) DrawConnections(p Piece, margin int) {
 	if p.leftConnector.connectionType == ConnectionTab {
 		for col := range margin {
 			w := p.leftConnector.tabGenerator.Get((float64(col) / float64(margin-1)))
-			lb := (ic.height / 2) - int(w*float64(margin))
-			ub := (ic.height / 2) + int(w*float64(margin))
+			lb := (p.image.height / 2) - int(w*float64(margin))
+			ub := (p.image.height / 2) + int(w*float64(margin))
 			for row := lb; row <= ub; row++ {
-				c := ic.pixels[row][margin-col].(color.NRGBA)
-				c.A = 255
-				ic.pixels[row][margin-col] = c
+				SetA(&p.image.pixels[row][margin-col], 255)
+				SetA(&p.image.pixels[row][margin+col], 255)
 			}
 		}
 	} else if p.leftConnector.connectionType == ConnectionBlank {
 		for col := range margin {
 			w := p.leftConnector.tabGenerator.Get((float64(col) / float64(margin-1)))
-			lb := (ic.height / 2) - int(w*float64(margin))
-			ub := (ic.height / 2) + int(w*float64(margin))
+			lb := (p.image.height / 2) - int(w*float64(margin))
+			ub := (p.image.height / 2) + int(w*float64(margin))
 			for row := lb; row <= ub; row++ {
-				c := ic.pixels[row][margin+col].(color.NRGBA)
-				c.A = 0
-				ic.pixels[row][margin+col] = c
+				SetA(&p.image.pixels[row][margin+col], 0)
+				SetA(&p.image.pixels[row][margin-col], 0)
 			}
 		}
 	}
+}
+
+func Sin(x float64, a float64, xs float64, c float64) float64 {
+	return a * math.Sin(xs*(x-c))
 }

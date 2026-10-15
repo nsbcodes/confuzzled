@@ -4,6 +4,7 @@ import (
 	"fmt"
 	_ "image/jpeg"
 	"log"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 )
@@ -15,6 +16,11 @@ const outputDir = "out"
 // Note that this is a multiplier
 // Should be 1.0 < margin < 1.5
 const margin = 1.2
+
+// Determines what proportion of the margin should be
+// reserved for perturbations (waves) in each puzzle piece
+// Basically the amplitude of the perturbations
+const perturb = 0.5
 
 func main() {
 	// Create puzzle object
@@ -29,7 +35,7 @@ func main() {
 	// i.e. ic.width  % puzzle.cols == 0
 	//      ic.height % puzzle.rows == 0
 	ic.Downsize(ic.width-(ic.width%puzzle.cols), ic.height-(ic.height%puzzle.rows))
-	fmt.Printf("Successfully downsized image into %dx%d.\n", ic.width, ic.height)
+	fmt.Printf("Successfully downsized image to %dx%d.\n", ic.width, ic.height)
 
 	gridColWidth := int((1.0 / float64(puzzle.cols)) * float64(ic.width))
 	gridRowHeight := int((1.0 / float64(puzzle.rows)) * float64(ic.height))
@@ -92,25 +98,56 @@ func main() {
 
 	marginWidth := int(float64(gridColWidth) * (margin - 1))
 
-	// Split main image and render the tabs/blanks mask
+	// Split main image and fill puzzle.pieces[id].image
 	for row := range puzzle.rows {
 		for col := range puzzle.cols {
 			// Added to the bottom, top, left, and right of the puzzle piece
 			pos1 := Coords{gridColWidth * col, gridRowHeight * row}
 			pos2 := Coords{gridColWidth * (col + 1), gridRowHeight * (row + 1)}
 			split_ic := ic.Split(pos1, pos2, marginWidth)
-			split_ic.DrawConnections(*puzzle.pieces[ID(row, col)], marginWidth)
 
 			puzzle.pieces[ID(row, col)].image = &split_ic
 		}
 	}
 
-	// // Apply noise perturbation to each piece
-	// for row := range puzzle.rows - 1 {
-	// 	for col := range puzzle.cols - 1 {
+	// Apply noise perturbation to each piece
+	// Our noise is just a sine wave sampled and multiplied randomly
 
-	// 	}
-	// }
+	// Left/Right Side Perturbation
+	for col := range puzzle.cols - 1 {
+		// noise params
+		xs := rand.Float64() * 0.01
+		c := rand.Float64() * 0.1
+		a := int(float64(marginWidth) * perturb)
+		for row := range puzzle.rows - 1 {
+			// only works because this is a ptr
+			// used as an alias instead of a value clone
+			imgLeft := puzzle.pieces[ID(row, col)].image
+			imgRight := puzzle.pieces[ID(row, col+1)].image
+			for y := range imgLeft.height - marginWidth - marginWidth {
+				w := int(Sin(float64(row*gridRowHeight)+float64(y), float64(a), xs, c))
+
+				if w > 0 {
+					for n := range w {
+						SetA(&imgLeft.pixels[y+marginWidth][imgLeft.width-1-marginWidth+n], 255)
+						SetA(&imgRight.pixels[y+marginWidth][marginWidth-1+n], 0)
+					}
+				} else {
+					for n := range -w {
+						SetA(&imgLeft.pixels[y+marginWidth][imgLeft.width-1-marginWidth-n], 0)
+						SetA(&imgRight.pixels[y+marginWidth][marginWidth-1-n], 255)
+					}
+				}
+			}
+		}
+	}
+
+	// Draw puzzle piece tabs and blanks
+	for row := range puzzle.rows {
+		for col := range puzzle.cols {
+			puzzle.pieces[ID(row, col)].DrawConnections(marginWidth)
+		}
+	}
 
 	// Export all several pngs
 	for row := range puzzle.rows {
