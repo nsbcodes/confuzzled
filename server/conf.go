@@ -2,6 +2,12 @@ package main
 
 import "path/filepath"
 
+// Puzzle Rows
+const puzzleRows = 5
+
+// Puzzle Columns
+const puzzleCols = 5
+
 // All server output will be stored in this folder
 const outputDir = "out"
 
@@ -13,6 +19,9 @@ const imageInputFile = "image.png"
 
 // Puzzle Data File Location
 const puzzleOutputFile = outputDir + string(filepath.Separator) + "puzzle.json"
+
+// State Data File Location
+const stateOutputFile = outputDir + string(filepath.Separator) + "state.json"
 
 // Margin for puzzle piece tabs (the knobs that stick out)
 // Note that this is a multiplier

@@ -32,14 +32,14 @@ func loadImage(src string) (ic *ImageContainer) {
 	// Open image file
 	file, err := os.Open(src)
 	if err != nil {
-		log.Fatalf("Error opening file: %v\n", err)
+		log.Fatalf("Error opening image file due to error \"%s\"", err)
 	}
 	defer file.Close()
 
 	// Decode image file
 	img, _, err := image.Decode(file)
 	if err != nil {
-		log.Fatalf("Error decoding image: %v\n", err)
+		log.Fatalf("Error decoding image due to error \"%s\"", err)
 		return
 	}
 

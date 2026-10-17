@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	_ "image/jpeg"
 	"log"
 	"math/rand/v2"
@@ -10,26 +9,40 @@ import (
 	"path/filepath"
 )
 
-func generate() {
+func generatePuzzle() {
 	// Scaffold directory
 	os.MkdirAll(imageOutputDir, os.ModePerm)
 
 	// Create puzzle object
-	puzzle := Puzzle{Rows: 5, Cols: 5}
+	puzzle := Puzzle{Rows: puzzleRows, Cols: puzzleCols}
 
 	// Can be jpg/jpeg/png
 	ic := loadImage(imageInputFile)
-	fmt.Printf("Successfully loaded image into a %dx%d array.\n", ic.width, ic.height)
+	log.Printf("Successfully loaded image into a %dx%d array.\n", ic.width, ic.height)
 
 	// Downscale image so that there are no remaining pixels
 	// Note that this might change the aspect ratio very slightly
 	// i.e. ic.width  % puzzle.cols == 0
 	//      ic.height % puzzle.rows == 0
 	ic.Downsize(ic.width-(ic.width%puzzle.Cols), ic.height-(ic.height%puzzle.Rows))
-	fmt.Printf("Successfully downsized image to %dx%d.\n", ic.width, ic.height)
+	log.Printf("Successfully downsized image to %dx%d.\n", ic.width, ic.height)
+	puzzle.Width = ic.width
+	puzzle.Height = ic.height
 
 	gridColWidth := int((1.0 / float64(puzzle.Cols)) * float64(ic.width))
 	gridRowHeight := int((1.0 / float64(puzzle.Rows)) * float64(ic.height))
+
+	// Set correct piece positions
+	// This is used as the solution for the puzzle
+	puzzle.CorrectPositions = make(map[string]Pos)
+	for row := range puzzle.Rows {
+		for col := range puzzle.Cols {
+			puzzle.CorrectPositions[ID(row, col)] = Pos{
+				X: float64(gridColWidth*col) + (float64(gridColWidth) / 2.0),
+				Y: float64(gridRowHeight*row) + (float64(gridRowHeight / 2.0)),
+			}
+		}
+	}
 
 	// Allocate puzzle pieces
 	puzzle.pieces = make(map[string]*Piece)
@@ -215,7 +228,7 @@ func generate() {
 			id := ID(row, col)
 			err = puzzle.pieces[ID(row, col)].image.ExportPNG(filepath.Join(imageOutputDir, id+".png"))
 			if err != nil {
-				log.Fatalf("Could not export split image due to error \"%s\"", err.Error())
+				log.Fatalf("Could not export split image due to error \"%s\"", err)
 			}
 		}
 	}
@@ -223,12 +236,12 @@ func generate() {
 	// Export json
 	jsonB, err := json.Marshal(puzzle)
 	if err != nil {
-		log.Fatalf("Error marshaling to JSON due to error \"%s\"", err.Error())
+		log.Fatalf("Error marshaling to JSON due to error \"%s\"", err)
 	}
 	err = os.WriteFile(puzzleOutputFile, jsonB, os.ModePerm)
 	if err != nil {
-		log.Fatalf("Error writing JSON file due to error \"%s\"", err.Error())
+		log.Fatalf("Error writing JSON file due to error \"%s\"", err)
 	}
 
-	fmt.Println("All puzzle pieces generatedly correctly!")
+	log.Println("All puzzle pieces generatedly correctly!")
 }
