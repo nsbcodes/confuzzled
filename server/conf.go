@@ -8,6 +8,11 @@ const puzzleRows = 5
 // Puzzle Columns
 const puzzleCols = 5
 
+// Puzzle Size
+// 1.0 occupies as much space as possible,
+// but the pieces will be large and cramped
+const puzzleSize = 0.7
+
 // All server output will be stored in this folder
 const outputDir = "out"
 

@@ -29,20 +29,14 @@ func generatePuzzle() {
 	puzzle.Width = ic.width
 	puzzle.Height = ic.height
 
-	gridColWidth := int((1.0 / float64(puzzle.Cols)) * float64(ic.width))
-	gridRowHeight := int((1.0 / float64(puzzle.Rows)) * float64(ic.height))
+	// Enforce 4:3 aspect for the HTML Canvas for our client
+	puzzle.CanvasHeight = int(float64(puzzle.Height) * (1.0 / puzzleSize))
+	puzzle.CanvasWidth = int(float64(puzzle.CanvasHeight) * (4.0 / 3.0))
 
-	// Set correct piece positions
-	// This is used as the solution for the puzzle
-	puzzle.CorrectPositions = make(map[string]Pos)
-	for row := range puzzle.Rows {
-		for col := range puzzle.Cols {
-			puzzle.CorrectPositions[ID(row, col)] = Pos{
-				X: float64(gridColWidth*col) + (float64(gridColWidth) / 2.0),
-				Y: float64(gridRowHeight*row) + (float64(gridRowHeight / 2.0)),
-			}
-		}
-	}
+	gridColWidth := int(float64(ic.width) / float64(puzzle.Cols))
+	gridRowHeight := int(float64(ic.height) / float64(puzzle.Rows))
+	puzzle.PieceWidth = gridColWidth
+	puzzle.PieceHeight = gridRowHeight
 
 	// Allocate puzzle pieces
 	puzzle.pieces = make(map[string]*Piece)
@@ -100,7 +94,8 @@ func generatePuzzle() {
 		}
 	}
 
-	marginWidth := int(float64(gridColWidth) * (margin - 1))
+	margin := int(float64(gridColWidth) * (margin - 1))
+	puzzle.Margin = margin
 
 	// Split main image and fill puzzle.pieces[id].image
 	for row := range puzzle.Rows {
@@ -108,7 +103,7 @@ func generatePuzzle() {
 			// Added to the bottom, top, left, and right of the puzzle piece
 			pos1 := Coords{gridColWidth * col, gridRowHeight * row}
 			pos2 := Coords{gridColWidth * (col + 1), gridRowHeight * (row + 1)}
-			split_ic := ic.Split(pos1, pos2, marginWidth)
+			split_ic := ic.Split(pos1, pos2, margin)
 
 			puzzle.pieces[ID(row, col)].image = &split_ic
 		}
@@ -121,20 +116,20 @@ func generatePuzzle() {
 	for col := range puzzle.Cols - 1 {
 		xs := rand.Float64() * perturbFrequency
 		c := rand.Float64() * 10.0
-		a := int(float64(marginWidth) * perturb)
+		a := int(float64(margin) * perturb)
 
 		for row := range puzzle.Rows {
 			imgLeft := puzzle.pieces[ID(row, col)].image
 			imgRight := puzzle.pieces[ID(row, col+1)].image
 
-			span := imgLeft.height - 2*marginWidth
+			span := imgLeft.height - 2*margin
 
 			for y := range span {
 				// Fade perturbation toward both corners
 				taper := 1.0
-				if marginWidth > 0 {
-					taper = float64(y) / float64(marginWidth)
-					end := float64(span-1-y) / float64(marginWidth)
+				if margin > 0 {
+					taper = float64(y) / float64(margin)
+					end := float64(span-1-y) / float64(margin)
 					if end < taper {
 						taper = end
 					}
@@ -150,13 +145,13 @@ func generatePuzzle() {
 
 				if w > 0 {
 					for n := range w {
-						SetA(&imgLeft.pixels[y+marginWidth][imgLeft.width-1-marginWidth+n], 255)
-						SetA(&imgRight.pixels[y+marginWidth][marginWidth-1+n], 0)
+						SetA(&imgLeft.pixels[y+margin][imgLeft.width-1-margin+n], 255)
+						SetA(&imgRight.pixels[y+margin][margin-1+n], 0)
 					}
 				} else {
 					for n := range -w {
-						SetA(&imgLeft.pixels[y+marginWidth][imgLeft.width-1-marginWidth-n], 0)
-						SetA(&imgRight.pixels[y+marginWidth][marginWidth-1-n], 255)
+						SetA(&imgLeft.pixels[y+margin][imgLeft.width-1-margin-n], 0)
+						SetA(&imgRight.pixels[y+margin][margin-1-n], 255)
 					}
 				}
 			}
@@ -167,20 +162,20 @@ func generatePuzzle() {
 	for row := range puzzle.Rows - 1 {
 		xs := rand.Float64() * perturbFrequency
 		c := rand.Float64() * 10.0
-		a := int(float64(marginWidth) * perturb)
+		a := int(float64(margin) * perturb)
 
 		for col := range puzzle.Cols {
 			imgTop := puzzle.pieces[ID(row, col)].image
 			imgBottom := puzzle.pieces[ID(row+1, col)].image
 
-			span := imgTop.width - 2*marginWidth
+			span := imgTop.width - 2*margin
 
 			for x := range span {
 				// Fade perturbation toward both corners
 				taper := 1.0
-				if marginWidth > 0 {
-					taper = float64(x) / float64(marginWidth)
-					end := float64(span-1-x) / float64(marginWidth)
+				if margin > 0 {
+					taper = float64(x) / float64(margin)
+					end := float64(span-1-x) / float64(margin)
 					if end < taper {
 						taper = end
 					}
@@ -194,17 +189,17 @@ func generatePuzzle() {
 
 				w := int(Sin(float64(col*gridColWidth+x), float64(a)*taper, xs, c))
 
-				px := x + marginWidth
+				px := x + margin
 
 				if w > 0 {
 					for n := range w {
-						SetA(&imgTop.pixels[imgTop.height-1-marginWidth+n][px], 255)
-						SetA(&imgBottom.pixels[marginWidth-1+n][px], 0)
+						SetA(&imgTop.pixels[imgTop.height-1-margin+n][px], 255)
+						SetA(&imgBottom.pixels[margin-1+n][px], 0)
 					}
 				} else {
 					for n := range -w {
-						SetA(&imgTop.pixels[imgTop.height-1-marginWidth-n][px], 0)
-						SetA(&imgBottom.pixels[marginWidth-1-n][px], 255)
+						SetA(&imgTop.pixels[imgTop.height-1-margin-n][px], 0)
+						SetA(&imgBottom.pixels[margin-1-n][px], 255)
 					}
 				}
 			}
@@ -214,7 +209,7 @@ func generatePuzzle() {
 	// Draw puzzle piece tabs and blanks
 	for row := range puzzle.Rows {
 		for col := range puzzle.Cols {
-			puzzle.pieces[ID(row, col)].DrawConnections(marginWidth)
+			puzzle.pieces[ID(row, col)].DrawConnections(margin)
 		}
 	}
 

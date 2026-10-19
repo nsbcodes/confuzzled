@@ -21,12 +21,16 @@ type Piece struct {
 
 // Puzzle Container Object
 type Puzzle struct {
-	pieces           map[string]*Piece
-	Rows             int
-	Cols             int
-	Width            int
-	Height           int
-	CorrectPositions map[string]Pos
+	pieces       map[string]*Piece
+	Rows         int
+	Cols         int
+	Width        int
+	Height       int
+	CanvasWidth  int
+	CanvasHeight int
+	PieceWidth   int
+	PieceHeight  int
+	Margin       int
 }
 
 // Puzzle Piece Connection Struct

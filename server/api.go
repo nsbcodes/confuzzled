@@ -21,6 +21,11 @@ type Pos struct {
 	X float64
 	Y float64
 }
+type PosReceive struct {
+	X      float64
+	Y      float64
+	UserID string
+}
 type PositionState map[string]Pos
 
 type LockReceive struct {
@@ -70,8 +75,8 @@ func (api *API) getPositionState() PositionState {
 		for row := range api.puzzle.Rows {
 			for col := range api.puzzle.Cols {
 				s[ID(row, col)] = Pos{
-					X: rand.Float64() * float64(api.puzzle.Width),
-					Y: rand.Float64() * float64(api.puzzle.Height),
+					X: ((rand.Float64() * 0.7) + 0.1) * float64(api.puzzle.CanvasWidth),
+					Y: ((rand.Float64() * 0.7) + 0.1) * float64(api.puzzle.CanvasHeight),
 				}
 			}
 		}
@@ -123,8 +128,12 @@ func (api *API) saveState(s PositionState) error {
 // Helper function to send JSON (bytes)
 func sendJSON(w http.ResponseWriter, a any) {
 	w.Header().Set("Content-Type", "application/json")
+	// w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	b, err := json.Marshal(a)
+	if string(b) == "null" {
+		b = []byte("")
+	}
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		log.Printf("Could not encode struct \"%s\" due to error \"%s\"", string(b), err)
@@ -190,6 +199,7 @@ func (api *API) sendUsers(w http.ResponseWriter) {
 }
 
 func (api *API) updateLockedState(w http.ResponseWriter, r *http.Request) {
+	// w.Header().Set("Access-Control-Allow-Origin", "*")
 	id := path.Base(r.URL.Path)
 
 	api.mu.Lock()
@@ -223,6 +233,7 @@ func (api *API) updateLockedState(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *API) updatePositionState(w http.ResponseWriter, r *http.Request) {
+	// w.Header().Set("Access-Control-Allow-Origin", "*")
 	id := path.Base(r.URL.Path)
 
 	api.mu.Lock()
@@ -230,13 +241,17 @@ func (api *API) updatePositionState(w http.ResponseWriter, r *http.Request) {
 
 	_, idExists := api.positionState[id]
 	if idExists {
-		var pos Pos
+		var pos PosReceive
 		err := json.NewDecoder(r.Body).Decode(&pos)
 		if err != nil {
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			return
 		}
-		api.positionState[id] = pos
+		if pos.UserID != api.lockedState[id].userID {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		api.positionState[id] = Pos{X: pos.X, Y: pos.Y}
 		api.positionStateUpdated = true
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
@@ -247,6 +262,7 @@ func (api *API) updatePositionState(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *API) registerUser(w http.ResponseWriter, r *http.Request) {
+	// w.Header().Set("Access-Control-Allow-Origin", "*")
 	name, err := url.PathUnescape(path.Base(r.URL.Path))
 	if err != nil || name == "" {
 		w.WriteHeader(http.StatusUnprocessableEntity)
@@ -266,7 +282,7 @@ func (api *API) registerUser(w http.ResponseWriter, r *http.Request) {
 // Host API
 func (api *API) run() {
 	// Returns OK and HTTP 200
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			sendHealth(w)
 		}
@@ -276,7 +292,7 @@ func (api *API) run() {
 	// Returns a UUID that can then be used to lock (reserve) pieces
 	// /register/{name} route, returns a UUID in the response
 	// name should be in encoded URI format, it can also include unicode (emojis)
-	http.HandleFunc("/users/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/users/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			api.registerUser(w, r)
 		}
@@ -284,21 +300,21 @@ func (api *API) run() {
 
 	// Get User route
 	// Returns the values of the map as a JSON list of strings
-	http.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/users", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			api.sendUsers(w)
 		}
 	})
 
 	// Returns puzzle struct
-	http.HandleFunc("/puzzle", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/puzzle", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			api.sendPuzzle(w)
 		}
 	})
 
 	// Returns current locked state
-	http.HandleFunc("/locked", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/locked", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			api.sendLockedState(w)
 		}
@@ -306,14 +322,14 @@ func (api *API) run() {
 
 	// Sets current locked state
 	// /lockedState/{ID} route, does lockedState[ID] = {Locked: newLocked}
-	http.HandleFunc("/locked/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/locked/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPut {
 			api.updateLockedState(w, r)
 		}
 	})
 
 	// Returns current position state
-	http.HandleFunc("/position", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/position", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			api.sendPositionState(w)
 		}
@@ -321,7 +337,7 @@ func (api *API) run() {
 
 	// Sets current position state
 	// /position/{ID} route does positionState[ID] = {X: newX, Y: newY}
-	http.HandleFunc("/position/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/position/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPut {
 			api.updatePositionState(w, r)
 		}
@@ -360,7 +376,7 @@ func (api *API) run() {
 	}()
 
 	// Serve image static files
-	http.Handle("/img/", http.StripPrefix("/img/", http.FileServer(http.Dir("./out/img"))))
+	http.Handle("/api/img/", http.StripPrefix("/api/img/", http.FileServer(http.Dir("./out/img"))))
 
 	log.Println("Puzzle API running on :8080")
 	err := http.ListenAndServe(":8080", nil)
