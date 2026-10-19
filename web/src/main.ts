@@ -297,7 +297,7 @@ async function main() {
 	document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
 	<div>
 		<h1>Confuzzled</h1>
-		<p>Procedural Puzzle Generator</p>
+		<p>Procedural Puzzle Generator and Game</p>
 		<div id="input-group">
 			<input type="text" placeholder="Enter Your Name Here!" id="submitNameInput" />
 			<input type="button" value="Submit Name" id="submitNameBtn" />
