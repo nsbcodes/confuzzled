@@ -119,8 +119,8 @@ function snapPiece(piece: LocalPiece) {
 }
 
 function render() {
-	document.getElementById("usersList")!.innerHTML =
-		`<li>${users.sort((a, b) => a.localeCompare(b)).join("</li><li>")}</li>`
+	document.getElementById("usersList")!.textContent =
+		`${users.sort((a, b) => a.localeCompare(b)).join(", ")}`
 
 	ctx.clearRect(0, 0, canvas.width, canvas.height)
 
@@ -371,7 +371,7 @@ async function synchronizeAPI() {
 
 
 async function startPuzzle() {
-	document.getElementById("input-group")!.outerHTML = `Hello ${userName}! &#x1F389<br><br>Users Joined:<ol id="usersList"></ol>`
+	document.getElementById("input-group")!.outerHTML = `Hello ${userName}! &#x1F389<br><br>Users Joined:<span id="usersList"></span>`
 
 	puzzle = await api.getPuzzle()
 	snapDistance = puzzle.CanvasHeight * snapProportion
