@@ -23,22 +23,25 @@ let ctx: CanvasRenderingContext2D
 let puzzle: api.Puzzle
 let userID: api.UserID
 let userName: string
-let users: api.Users
-let lockedPieces: api.LockedPieces
 
 // Drag State
 let draggedPiece: LocalPiece | null = null
 let dragOffsetX = 0
 let dragOffsetY = 0
 let snapDistance: number
+let dirtyPieces = new Set<api.PieceID>
 
 // Polling Variables
 // These are updated frequently by polling the API
 let positions: api.PositionMap /* Holds server's positions */
+let users: api.Users
+let lockedPieces: api.LockedPieces
 
 // Configuration Constants
 const snapProportion = 0.03
-const pollMs = 100
+const pollMS = 50
+const lockedText = (name: string) => `\u{1F512} Locked by ${name}`
+const lockedTextSizeProportion = 0.025
 
 async function setLocalPieces() {
 	const promises: Promise<void>[] = []
@@ -51,16 +54,16 @@ async function setLocalPieces() {
 				image.onload = () => {
 					const cx = positions.get(id)!.X
 					const cy = positions.get(id)!.Y
-					const lp: LocalPiece = {
-						draw_x: cx - puzzle.Margin,
-						draw_y: cy - puzzle.Margin,
-						x1: cx,
-						x2: cx + puzzle.PieceWidth,
-						y1: cy,
-						y2: cy + puzzle.PieceHeight,
-						image: image,
-						id: id
+					let lp: LocalPiece = {
+						image: image, id: id,
+						draw_x: 0,
+						draw_y: 0,
+						x1: 0,
+						x2: 0,
+						y1: 0,
+						y2: 0
 					}
+					setPiecePos(lp, cx, cy)
 					localPieces.push(lp)
 					resolve()
 				}
@@ -116,6 +119,9 @@ function snapPiece(piece: LocalPiece) {
 }
 
 function render() {
+	document.getElementById("usersList")!.innerHTML =
+		`<li>${users.sort((a, b) => a.localeCompare(b)).join("</li><li>")}</li>`
+
 	ctx.clearRect(0, 0, canvas.width, canvas.height)
 
 	for (const p of localPieces) {
@@ -123,8 +129,21 @@ function render() {
 			// Draw the image
 			ctx.drawImage(p.image, p.draw_x, p.draw_y, p.image.width, p.image.height)
 
-			// Disable shadow
-			ctx.shadowColor = "transparent"
+			// Draw a lock and owner if the piece is locked and it isn't ours
+			if (lockedPieces.get(p.id)?.Locked && lockedPieces.get(p.id)?.UserID != userID) {
+				const lockedTextSize = lockedTextSizeProportion * puzzle.CanvasHeight
+				ctx.font = `normal ${lockedTextSize}px Sniglet`
+				ctx.shadowColor = "transparent"
+				ctx.textBaseline = "top"
+				const t = lockedText(lockedPieces.get(p.id)!.Name)
+				const textWidth = ctx.measureText(t).width
+				const x = (p.draw_x + puzzle.Margin + puzzle.PieceWidth / 2) - (textWidth / 2)
+				const y = (p.draw_y + puzzle.Margin + puzzle.PieceHeight / 2) - (lockedTextSize / 2)
+				ctx.fillStyle = "#504246"
+				ctx.fillRect(x, y, textWidth, lockedTextSize)
+				ctx.fillStyle = "#d8e2dc"
+				ctx.fillText(t, x, y)
+			}
 		}
 	}
 
@@ -194,12 +213,23 @@ function getPieceAt(x: number, y: number, notPiece?: LocalPiece): LocalPiece | n
 	return null
 }
 
+function setPiecePos(piece: LocalPiece, x: number, y: number) {
+	piece.draw_x = x
+	piece.draw_y = y
+	piece.x1 = x + puzzle.Margin
+	piece.x2 = x + puzzle.Width - puzzle.Margin
+	piece.y1 = y + puzzle.Margin
+	piece.y2 = y + puzzle.Height - puzzle.Margin
+}
+
 function setupDragAndDrop() {
 	canvas.addEventListener("pointerdown", (event: PointerEvent) => {
 		const pos = getCanvasMouse(event)
 		const piece = getPieceAt(pos.x, pos.y)
 
 		if (!piece) return
+
+		// From now on, a piece has been identified where the cursor has clicked
 
 		draggedPiece = piece
 
@@ -216,7 +246,7 @@ function setupDragAndDrop() {
 		const pos = getCanvasMouse(event)
 
 		if (!draggedPiece) {
-			// Make sure piece exists at cursor
+			// Make sure piece still exists at cursor
 			const piece = getPieceAt(pos.x, pos.y)
 
 			canvas.style.cursor = piece
@@ -225,69 +255,132 @@ function setupDragAndDrop() {
 			return
 		}
 
-		draggedPiece.draw_x = pos.x - dragOffsetX
-		draggedPiece.draw_y = pos.y - dragOffsetY
-		draggedPiece.x1 = draggedPiece.draw_x + puzzle.Margin
-		draggedPiece.x2 = draggedPiece.draw_x + puzzle.Width - puzzle.Margin
-		draggedPiece.y1 = draggedPiece.draw_y + puzzle.Margin
-		draggedPiece.y2 = draggedPiece.draw_y + puzzle.Height - puzzle.Margin
+		// From now on, a piece has been identified where the cursor has moved
+
+		dirtyPieces.add(draggedPiece.id)
+		setPiecePos(draggedPiece, pos.x - dragOffsetX, pos.y - dragOffsetY)
 
 		render()
 	})
 
-	function stopDragging() {
+	async function stopDragging() {
 		if (!draggedPiece) return
 
 		// Move the dragged piece to end so it renders on top
+		// after draggedPiece is set to null
 		localPieces = localPieces.filter(p => p !== draggedPiece)
 		localPieces.push(draggedPiece)
 
 		snapPiece(draggedPiece)
+		let _dp = draggedPiece
 		draggedPiece = null
 		canvas.style.cursor = "default"
+
 		render()
+
+		// Write position to server
+		let res = await api.movePiece(userID, _dp.id, {X: _dp.draw_x, Y: _dp.draw_y})
+
+		// Unlock the piece as well if that worked
+		if (res) {
+			await api.lockPiece(userID, _dp.id, false)
+			dirtyPieces.delete(_dp.id)
+		}
 	}
 
 	canvas.addEventListener("pointerup", stopDragging)
 	canvas.addEventListener("pointercancel", stopDragging)
 }
 
+async function submitUser() {
+	let nameInput = document.getElementById("submitNameInput")! as HTMLInputElement
+	userName = nameInput.value.trim()
+	if (userName === "") {
+		window.alert("Please enter a valid username!")
+		return
+	}
+	userID = await api.registerUser(userName)
+	startPuzzle()
+}
+
 function setupNameBtn() {
 	let nameBtn = document.getElementById("submitNameBtn")! as HTMLButtonElement
 	let nameInput = document.getElementById("submitNameInput")! as HTMLInputElement
-	nameBtn.addEventListener("click", async () => {
-		userName = nameInput.value.trim()
-		if (userName === "") {
-			window.alert("Please enter a valid username!")
-			return
+	nameInput.addEventListener("keydown", function (e: KeyboardEvent) {
+		if (e.key === "Enter") {
+			e.preventDefault()
+			submitUser()
 		}
-		userID = await api.registerUser(userName)
-		startPuzzle()
 	})
+	nameBtn.addEventListener("click", submitUser)
 }
 
 // Polling function to get and send state
+// Gets: users, lockedPieces, and positions
+// Sends: locks pieces and updates positions to the server
 async function synchronizeAPI() {
+	// Get data
 	users = await api.getUsers()
-	lockedPieces = await api.getLockedPieces()
 	positions = await api.getPositions()
+	lockedPieces = await api.getLockedPieces()
 
-	// Schedule next run of this function after this one has been completed
-	setTimeout(synchronizeAPI, pollMs)
+	// Check if any pieces changed compared to server's position data
+	// If so, lock the piece and then update it
+	for (const piece of localPieces) {
+		const serverPiecePos = positions.get(piece.id)
+		
+		// console.log(piece.id, piece.draw_x, serverPiecePos?.X)
+		if (piece.draw_x != serverPiecePos?.X || piece.draw_y != serverPiecePos?.Y) {
+			// This means that a piece ("piece") has been changed,
+			// and we must update the server's state
+
+			if (dirtyPieces.has(piece.id)) {
+				// We might have moved this piece, in this case,
+				// try to lock the piece and send the correct position.
+				// Otherwise, if we can't lock the piece, put it back.
+
+				let res = await api.lockPiece(userID, piece.id, true)
+
+				if (res) {
+					// Succeeded to lock piece
+					// This means that the piece is ours,
+					// and we should update the server's state
+					await api.movePiece(userID, piece.id, { X: piece.draw_x, Y: piece.draw_y })
+					dirtyPieces.delete(piece.id)
+				} else {
+					// Failed to lock piece
+					// In this case, return it to the server's position
+					setPiecePos(piece, serverPiecePos!.X, serverPiecePos!.Y)
+				}
+			} else {
+				// This means that we did not move this piece
+				// Instead, someone else did and we should update our own state
+				setPiecePos(piece, serverPiecePos!.X, serverPiecePos!.Y)
+			}
+		}
+	}
+
+	// Rerender with updated info
+	// This might trigger an unnecessary render,
+	// but our interval is also not very often
+	render()
+
+	// Schedule next run of this function now that we're done
+	setTimeout(synchronizeAPI, pollMS)
 }
 
 
 async function startPuzzle() {
-	document.getElementById("input-group")!.outerHTML = `Hello ${userName}! &#x1F389`
+	document.getElementById("input-group")!.outerHTML = `Hello ${userName}! &#x1F389<br><br>Users Joined:<ol id="usersList"></ol>`
 
 	puzzle = await api.getPuzzle()
 	snapDistance = puzzle.CanvasHeight * snapProportion
-	positions = await api.getPositions()
 
 	document.querySelector<HTMLDivElement>('#app')!.innerHTML += `<canvas width=${puzzle.CanvasWidth} height=${puzzle.CanvasHeight} id="mainCanvas"></canvas>`
 	canvas = document.getElementById("mainCanvas")! as HTMLCanvasElement
 	ctx = canvas.getContext('2d')!
 
+	await synchronizeAPI()
 	await setLocalPieces()
 	setupDragAndDrop()
 	render()

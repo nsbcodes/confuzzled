@@ -20,6 +20,7 @@ export type Puzzle = {
 export type LockedPiece = {
     Name: string
     Locked: boolean
+    UserID: PieceID
 }
 
 export type LockedPieces = Map<PieceID, LockedPiece>
@@ -45,11 +46,11 @@ export function lockPiece(userID: UserID, piece: PieceID, locked: boolean): Prom
             "UserID": userID,
             "Locked": locked
         })
-    }).then(res => { return res.status == 204 })
+    }).then(res => { console.log(res.status); return res.status == 204 })
 }
 
 export function movePiece(userID: UserID, piece: PieceID, coords: Pos): Promise<boolean> {
-    return fetch(`/api/locked/${piece}`, {
+    return fetch(`/api/position/${piece}`, {
         method: "PUT",
         body: JSON.stringify({
             "UserID": userID,
@@ -59,7 +60,7 @@ export function movePiece(userID: UserID, piece: PieceID, coords: Pos): Promise<
 }
 
 export function getPuzzle(): Promise<Puzzle> {
-    return fetch("/api/puzzle")
+    return fetch("/api/puzzle", { cache: "no-store" })
         .then(res => res.json())
         .then(res => {
             return res as Puzzle
@@ -67,7 +68,7 @@ export function getPuzzle(): Promise<Puzzle> {
 }
 
 export function getLockedPieces(): Promise<LockedPieces> {
-    return fetch("/api/locked")
+    return fetch("/api/locked", { cache: "no-store" })
         .then(res => res.json())
         .then(res => {
             res = new Map(
@@ -79,7 +80,7 @@ export function getLockedPieces(): Promise<LockedPieces> {
 }
 
 export function getUsers(): Promise<Users> {
-    return fetch("/api/users")
+    return fetch("/api/users", { cache: "no-store" })
         .then(res => res.json())
         .then(res => {
             return res as Users
@@ -87,7 +88,7 @@ export function getUsers(): Promise<Users> {
 }
 
 export function getPositions(): Promise<PositionMap> {
-    return fetch("/api/position")
+    return fetch("/api/position", { cache: "no-store" })
         .then(res => res.json())
         .then(res => {
             res = new Map(

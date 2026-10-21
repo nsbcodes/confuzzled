@@ -35,8 +35,7 @@ type LockReceive struct {
 type Lock struct {
 	Name   string
 	Locked bool
-	// private - don't serialize!
-	userID string
+	UserID string
 }
 type LockedState map[string]Lock
 
@@ -128,7 +127,7 @@ func (api *API) saveState(s PositionState) error {
 // Helper function to send JSON (bytes)
 func sendJSON(w http.ResponseWriter, a any) {
 	w.Header().Set("Content-Type", "application/json")
-	// w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Cache-Control", "no-store")
 
 	b, err := json.Marshal(a)
 	if string(b) == "null" {
@@ -218,12 +217,12 @@ func (api *API) updateLockedState(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		if piece.Locked && piece.userID != receive.UserID {
+		if piece.Locked && piece.UserID != receive.UserID {
 			w.WriteHeader(http.StatusConflict)
 			return
 		}
 
-		api.lockedState[id] = Lock{Name: name, Locked: receive.Locked, userID: receive.UserID}
+		api.lockedState[id] = Lock{Name: name, Locked: receive.Locked, UserID: receive.UserID}
 	} else {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -247,7 +246,7 @@ func (api *API) updatePositionState(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			return
 		}
-		if pos.UserID != api.lockedState[id].userID {
+		if pos.UserID != api.lockedState[id].UserID {
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
@@ -376,7 +375,10 @@ func (api *API) run() {
 	}()
 
 	// Serve image static files
-	http.Handle("/api/img/", http.StripPrefix("/api/img/", http.FileServer(http.Dir("./out/img"))))
+	http.Handle("/api/img/", http.StripPrefix("/api/img/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		http.FileServer(http.Dir("./out/img")).ServeHTTP(w, r)
+	})))
 
 	log.Println("Puzzle API running on :8080")
 	err := http.ListenAndServe(":8080", nil)
