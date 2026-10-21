@@ -48,6 +48,7 @@ func (c *Config) LoadConfig() {
 	stat, err := os.Stat(configFile)
 	if errors.Is(err, os.ErrNotExist) {
 		log.Printf("No custom json config file found, using defaults.")
+		return
 	} else if stat.IsDir() {
 		log.Fatalf("Could not read json config file %s because it is a directory", configFile)
 	} else if err != nil {
