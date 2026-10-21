@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"maps"
 	"math/rand/v2"
@@ -10,7 +11,9 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -48,7 +51,9 @@ func getPuzzle() Puzzle {
 	_, err := os.Stat(outputDir)
 	if errors.Is(err, os.ErrNotExist) {
 		log.Printf("Could not find output directory %s, generating puzzle...", outputDir)
-		generatePuzzle()
+		c := InitConfig()
+		c.LoadConfig()
+		generatePuzzle(c)
 	}
 
 	// Load the puzzle.json file
@@ -278,6 +283,20 @@ func (api *API) registerUser(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(id))
 }
 
+func IsDirEmpty(p string) (bool, error) {
+	f, err := os.Open(p)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+
+	_, err = f.Readdirnames(1)
+	if err == io.EOF {
+		return true, nil
+	}
+	return false, err
+}
+
 // Host API
 func (api *API) run() {
 	// Returns OK and HTTP 200
@@ -380,7 +399,40 @@ func (api *API) run() {
 		http.FileServer(http.Dir("./out/img")).ServeHTTP(w, r)
 	})))
 
+	// Serve build output files (from "npm run build" at /web directory)
+	// During development, you can skip this and use the Vite proxy to bypass CORS
+	// This is already configured and "npm run dev" will enable it automatically
+	stat, err := os.Stat(serveFolder)
+	if err == nil && stat.IsDir() {
+		empty, err := IsDirEmpty(serveFolder)
+		if err == nil && !empty {
+			log.Printf("Found non-empty serve folder, serving folder %s", serveFolder)
+
+			fs := http.FileServer(http.Dir(serveFolder))
+			http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Cache-Control", "no-store")
+				// Don't serve frontend files for any API routes.
+				if strings.HasPrefix(r.URL.Path, "/api/") {
+					http.NotFound(w, r)
+					return
+				}
+				// Serve existing files directly
+				filePath := filepath.Join(serveFolder, filepath.Clean(r.URL.Path))
+				if info, err := os.Stat(filePath); err == nil && !info.IsDir() {
+					fs.ServeHTTP(w, r)
+					return
+				}
+				// Fall back to index.html
+				http.ServeFile(w, r, filepath.Join(serveFolder, "index.html"))
+			})
+		} else {
+			log.Println("Only serving API, failed check for serve folder emptiness.")
+		}
+	} else {
+		log.Println("Only serving API, could not find serve folder.")
+	}
+
 	log.Println("Puzzle API running on :8080")
-	err := http.ListenAndServe(":8080", nil)
+	err = http.ListenAndServe(":8080", nil)
 	log.Fatalf("Exiting, API failed due to error \"%s\"", err)
 }

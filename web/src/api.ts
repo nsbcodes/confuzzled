@@ -46,7 +46,7 @@ export function lockPiece(userID: UserID, piece: PieceID, locked: boolean): Prom
             "UserID": userID,
             "Locked": locked
         })
-    }).then(res => { console.log(res.status); return res.status == 204 })
+    }).then(res => { return res.status == 204 })
 }
 
 export function movePiece(userID: UserID, piece: PieceID, coords: Pos): Promise<boolean> {

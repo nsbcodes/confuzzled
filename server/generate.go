@@ -9,12 +9,12 @@ import (
 	"path/filepath"
 )
 
-func generatePuzzle() {
+func generatePuzzle(config Config) {
 	// Scaffold directory
 	os.MkdirAll(imageOutputDir, os.ModePerm)
 
 	// Create puzzle object
-	puzzle := Puzzle{Rows: puzzleRows, Cols: puzzleCols}
+	puzzle := Puzzle{Rows: config.puzzleRows, Cols: config.puzzleCols}
 
 	// Can be jpg/jpeg/png
 	ic := loadImage(imageInputFile)
@@ -30,7 +30,7 @@ func generatePuzzle() {
 	puzzle.Height = ic.height
 
 	// Enforce 4:3 aspect for the HTML Canvas for our client
-	puzzle.CanvasHeight = int(float64(puzzle.Height) * (1.0 / puzzleSize))
+	puzzle.CanvasHeight = int(float64(puzzle.Height) * (1.0 / config.puzzleSize))
 	puzzle.CanvasWidth = int(float64(puzzle.CanvasHeight) * (4.0 / 3.0))
 
 	gridColWidth := int(float64(ic.width) / float64(puzzle.Cols))
@@ -94,7 +94,7 @@ func generatePuzzle() {
 		}
 	}
 
-	margin := int(float64(gridColWidth) * (margin - 1))
+	margin := int(float64(gridColWidth) * (config.margin - 1))
 	puzzle.Margin = margin
 
 	// Split main image and fill puzzle.pieces[id].image
@@ -114,9 +114,9 @@ func generatePuzzle() {
 
 	// Left/Right Side Perturbation
 	for col := range puzzle.Cols - 1 {
-		xs := rand.Float64() * perturbFrequency
+		xs := rand.Float64() * config.perturbFrequency
 		c := rand.Float64() * 10.0
-		a := int(float64(margin) * perturb)
+		a := int(float64(margin) * config.perturb)
 
 		for row := range puzzle.Rows {
 			imgLeft := puzzle.pieces[ID(row, col)].image
@@ -160,9 +160,9 @@ func generatePuzzle() {
 
 	// Top/Bottom Side Perturbation
 	for row := range puzzle.Rows - 1 {
-		xs := rand.Float64() * perturbFrequency
+		xs := rand.Float64() * config.perturbFrequency
 		c := rand.Float64() * 10.0
-		a := int(float64(margin) * perturb)
+		a := int(float64(margin) * config.perturb)
 
 		for col := range puzzle.Cols {
 			imgTop := puzzle.pieces[ID(row, col)].image
