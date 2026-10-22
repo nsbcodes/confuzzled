@@ -120,7 +120,7 @@ function snapPiece(piece: LocalPiece) {
 
 function render() {
 	document.getElementById("usersList")!.textContent =
-		`${users.sort((a, b) => a.localeCompare(b)).join(", ")}`
+		` ${users.sort((a, b) => a.localeCompare(b)).join(", ")}`
 
 	ctx.clearRect(0, 0, canvas.width, canvas.height)
 
