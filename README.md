@@ -96,4 +96,83 @@ Here is a chronological overview of what the program does to accomplish this:
 
 The API currently implemented is enough for all core functionality. If this were a production application, I would implement data validation and authentication on the server side. Currently, there is nothing preventing a single rogue user from ruining the current instance of the puzzle at hand. However, I was careful of preventing any XSS vectors and making sure the API runs fast enough (each request only takes a few ms).
 
-#### POST /api/users/
+To see the API's code on the server side, check out `server/api.go`. For an example implementation/consumer of this API, see `web/src/api.ts`.
+
+#### GET /api/health
+
+Returns Status `200` with response body `OK`.
+
+#### GET /api/users
+
+Returns Status `200` with JSON response body containing a list of usernames (strings)
+
+#### POST /api/users/{username}
+
+Returns Status `201` with text response body containing a UUID (referred to as `userID` in the client and server). This UUID is used to confirm that the client has its own user registered. `{username}` can be any Unicode string encoded as a URI. Further `PUT` requests require this User ID and ensure that this user exists and the piece is not already locked by a different User ID.
+
+Please note that the UUID sent does not serve as an authentication token. A malicious client can get another client's UUID through `GET /api/locked` and lock/move around pieces on their behalf. Instead, use this rather than `{username}` to formalize registration and ensure that two users can have the same name if they desire.
+
+#### GET /api/puzzle
+
+Returns Status `200` with JSON response body containing an object with information about the puzzle. The properties are listed below:
+
+```ts
+{
+    Rows: number
+    Cols: number
+    Width: number
+    Height: number
+    PieceWidth: number
+    PieceHeight: number
+    CanvasWidth: number
+    CanvasHeight: number
+    Margin: number
+}
+```
+
+#### GET /api/locked
+
+Returns Status `200` with JSON response body containing a `Map<string, object>`, where the key/string represents the PieceID and the value/object represents each piece's locked state. The properties for each piece's locked state are listed below:
+
+```ts
+{
+    Name: string
+    Locked: boolean
+    UserID: PieceID
+}
+```
+
+#### PUT /api/locked/{PieceID}
+
+Returns Status `204` upon success. Locks a piece given its valid `{PieceID}` in the URL. Requires a response body containing the below as JSON:
+
+```ts
+{
+    UserID: string
+    Locked: boolean
+}
+```
+
+#### GET /api/position
+
+Returns Status `200` with JSON response body containing a `Map<string, object>`, where the key/string represents the PieceID and the value/object represents each piece's locked state. The properties for each piece's locked state are listed below:
+
+```ts
+{
+    Name: string
+    Locked: boolean
+    UserID: PieceID
+}
+```
+
+#### PUT /api/position/{PieceID}
+
+Returns Status `204` upon success. Locks a piece given its valid `{PieceID}` in the URL. Requires a response body containing the below as JSON:
+
+```ts
+{
+    UserID: string
+    X: number
+    Y: number
+}
+```
