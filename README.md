@@ -4,8 +4,28 @@ Procedural Puzzle Generator and Multiplayer Game made using a Go backend API and
 
 ## Demo
 
-> Blank State
-> 
+> Fresh Start
+
+<img width="1420" height="1514" alt="Screenshot 2026-10-27 140747" src="https://github.com/user-attachments/assets/3746d007-f942-46b1-8d28-132baf5bf201" />
+
+> Multiplayer Gameplay
+
+https://github.com/user-attachments/assets/366f25f9-d69d-46c6-bcf1-f757815bf541
+
+> Server Output (new puzzle generated, no cache available)
+
+```ps1
+PS > go run .
+2026/10/27 13:18:11 Could not find output directory out, generating puzzle...
+2026/10/27 13:18:11 No custom json config file found, using defaults.
+2026/10/27 13:18:11 Successfully loaded image into a 1750x2500 array.
+2026/10/27 13:18:11 Successfully downsized image to 1750x2500.
+2026/10/27 13:18:15 All puzzle pieces generatedly correctly!
+2026/10/27 13:18:15 Successfully found puzzle at out\puzzle.json!
+2026/10/27 13:18:15 Could not find state file out\state.json, using new state...
+2026/10/27 13:18:15 Found non-empty serve folder, serving folder serve
+2026/10/27 13:18:15 Puzzle API running on :8080
+```
 
 ## Usage
 
