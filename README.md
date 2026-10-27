@@ -2,6 +2,11 @@
 
 Procedural Puzzle Generator and Multiplayer Game made using a Go backend API and Typescript (HTML Canvas) frontend.
 
+## Demo
+
+> Blank State
+> 
+
 ## Usage
 
 The backend in the `server` directory hosts both the API and the compiled static site files. You can compile a binary using `go build` or simply run the backend in place using `go run`. If you choose the latter, all user configuration or build artifacts files have already been added to the `.gitignore` at the root of this directory (i.e., this should not make your repo instance dirty according to Git).
@@ -42,6 +47,10 @@ Run the backend by using `go run .` while inside of the `server` directory. If y
 ### Run Frontend
 
 If you copied the output of `npm run build` in the `dist` directory to `server/serve`, the frontend is also hosted along with the API on the same port `:8080`. Open up `localhost:8080` to see the website in action.
+
+### Rebuild Puzzle
+
+If you make any change in the server configuration, you should rebuild the current state by deleting the `out` directory that is generated in the working directory. Do not try to modify the contents of the `out` directory manually. The server will then rebuild the puzzle.
 
 ### Development
 
